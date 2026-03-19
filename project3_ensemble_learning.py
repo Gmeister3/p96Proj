@@ -5,9 +5,8 @@ Dataset: CelebA (attributes only — no image download required)
 
 This script:
 1. Loads the CelebA attribute table (list_attr_celeba.txt).
-   Download list_attr_celeba.txt from
-   https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html and place it in
-   the same directory as this script before running.
+   If the file is not present it is downloaded automatically from
+   Google Drive using gdown (pip install gdown).
 2. Trains a Decision Tree, Random Forest, and AdaBoost classifier to
    predict the 'Smiling' attribute from the remaining 39 attributes.
 3. Evaluates all three models with accuracy, precision, recall, F1,
@@ -75,13 +74,38 @@ def load_celeba_attributes(path: str) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 2 — LOAD DATA
 # ─────────────────────────────────────────────────────────────────────────────
+def download_celeba_attributes(dest_path: str) -> None:
+    """Download list_attr_celeba.txt from the official CelebA Google Drive mirror.
+
+    Requires the ``gdown`` package (pip install gdown).
+    The file is ~25 MB and contains binary attribute labels for 202,599 images.
+    """
+    try:
+        import gdown  # type: ignore
+    except ImportError as exc:
+        raise ImportError(
+            "The 'gdown' package is required to download the CelebA attribute file.\n"
+            "Install it with:  pip install gdown"
+        ) from exc
+
+    # Official CelebA Google Drive file ID for list_attr_celeba.txt
+    CELEBA_FILE_ID = "0B7EVK8r0v71pblRyaVFSWGxPY0U"
+    url = f"https://drive.google.com/uc?id={CELEBA_FILE_ID}"
+    print(f"Downloading CelebA attribute file to '{dest_path}' …")
+    gdown.download(url, dest_path, quiet=False)
+    if not os.path.exists(dest_path):
+        raise RuntimeError(
+            "Download failed. Possible causes: no internet connection, Google Drive\n"
+            "quota exceeded, or the file ID has changed.\n"
+            "As a fallback, download list_attr_celeba.txt manually from\n"
+            "https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html\n"
+            "and place it in the same directory as this script."
+        )
+    print("Download complete.")
+
+
 if not os.path.exists(CELEBA_ATTR_PATH):
-    raise FileNotFoundError(
-        f"CelebA attribute file not found: '{CELEBA_ATTR_PATH}'\n"
-        "Download list_attr_celeba.txt from "
-        "https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html "
-        "and place it in the same directory as this script."
-    )
+    download_celeba_attributes(CELEBA_ATTR_PATH)
 
 print(f"Loading CelebA attributes from '{CELEBA_ATTR_PATH}' …")
 df = load_celeba_attributes(CELEBA_ATTR_PATH)
