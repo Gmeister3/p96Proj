@@ -5,8 +5,9 @@ Dataset: CelebA (attributes only — no image download required)
 
 This script:
 1. Loads the CelebA attribute table (list_attr_celeba.txt).
-   If that file is not present it generates a realistic synthetic
-   stand-in so the script still runs end-to-end without the dataset.
+   Download list_attr_celeba.txt from
+   https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html and place it in
+   the same directory as this script before running.
 2. Trains a Decision Tree, Random Forest, and AdaBoost classifier to
    predict the 'Smiling' attribute from the remaining 39 attributes.
 3. Evaluates all three models with accuracy, precision, recall, F1,
@@ -71,66 +72,19 @@ def load_celeba_attributes(path: str) -> pd.DataFrame:
     return df
 
 
-def make_synthetic_celeba(n_samples: int = 20_000) -> pd.DataFrame:
-    """
-    Generate a synthetic binary attribute table that mimics the statistical
-    structure of CelebA.  Attribute names and marginal frequencies are taken
-    from the published CelebA paper (Liu et al., 2015).
-    """
-    print("[INFO] CelebA attribute file not found. Using synthetic data.\n"
-          "       To use real CelebA data: download list_attr_celeba.txt from\n"
-          "       https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html and place\n"
-          "       it in the same directory as this script.\n")
-
-    # Approximate marginal frequencies per attribute (40 binary attributes)
-    attr_freq = {
-        "5_o_Clock_Shadow": 0.11, "Arched_Eyebrows": 0.27, "Attractive": 0.51,
-        "Bags_Under_Eyes": 0.20, "Bald": 0.02, "Bangs": 0.15,
-        "Big_Lips": 0.24, "Big_Nose": 0.24, "Black_Hair": 0.24,
-        "Blond_Hair": 0.15, "Blurry": 0.05, "Brown_Hair": 0.21,
-        "Bushy_Eyebrows": 0.14, "Chubby": 0.06, "Double_Chin": 0.05,
-        "Eyeglasses": 0.07, "Goatee": 0.06, "Gray_Hair": 0.04,
-        "Heavy_Makeup": 0.39, "High_Cheekbones": 0.45, "Male": 0.42,
-        "Mouth_Slightly_Open": 0.48, "Mustache": 0.04, "Narrow_Eyes": 0.12,
-        "No_Beard": 0.83, "Oval_Face": 0.28, "Pale_Skin": 0.04,
-        "Pointy_Nose": 0.28, "Receding_Hairline": 0.08, "Rosy_Cheeks": 0.07,
-        "Sideburns": 0.06, "Smiling": 0.48, "Straight_Hair": 0.21,
-        "Wavy_Hair": 0.32, "Wearing_Earrings": 0.19, "Wearing_Hat": 0.05,
-        "Wearing_Lipstick": 0.47, "Wearing_Necklace": 0.12,
-        "Wearing_Necktie": 0.07, "Young": 0.77,
-    }
-
-    rng = np.random.default_rng(42)
-    data = {}
-    for attr, p in attr_freq.items():
-        data[attr] = rng.binomial(1, p, size=n_samples)
-
-    df = pd.DataFrame(data)
-
-    # Introduce mild correlations that reflect real facial attribute co-occurrence.
-    # E.g. Smiling correlates with High_Cheekbones and Mouth_Slightly_Open.
-    smile = df["Smiling"].astype(float)
-    df["High_Cheekbones"] = np.clip(
-        rng.binomial(1, 0.45 + 0.25 * smile.values, n_samples), 0, 1
-    )
-    df["Mouth_Slightly_Open"] = np.clip(
-        rng.binomial(1, 0.40 + 0.30 * smile.values, n_samples), 0, 1
-    )
-    df["Rosy_Cheeks"] = np.clip(
-        rng.binomial(1, 0.05 + 0.10 * smile.values, n_samples), 0, 1
-    )
-
-    return df.astype(int)
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 2 — LOAD DATA
 # ─────────────────────────────────────────────────────────────────────────────
-if os.path.exists(CELEBA_ATTR_PATH):
-    print(f"Loading CelebA attributes from '{CELEBA_ATTR_PATH}' …")
-    df = load_celeba_attributes(CELEBA_ATTR_PATH)
-else:
-    df = make_synthetic_celeba(n_samples=20_000)
+if not os.path.exists(CELEBA_ATTR_PATH):
+    raise FileNotFoundError(
+        f"CelebA attribute file not found: '{CELEBA_ATTR_PATH}'\n"
+        "Download list_attr_celeba.txt from "
+        "https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html "
+        "and place it in the same directory as this script."
+    )
+
+print(f"Loading CelebA attributes from '{CELEBA_ATTR_PATH}' …")
+df = load_celeba_attributes(CELEBA_ATTR_PATH)
 
 print(f"Dataset shape  : {df.shape[0]:,} samples × {df.shape[1]} attributes")
 print(f"Target         : {TARGET_ATTR!r}  (positive class = {df[TARGET_ATTR].mean()*100:.1f}%)")
