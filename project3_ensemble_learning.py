@@ -56,7 +56,8 @@ COLORS = ["#4C72B0", "#DD8452", "#55A868"]   # DT, RF, AdaBoost
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 1 — DATA LOADING
 # ─────────────────────────────────────────────────────────────────────────────
-CELEBA_ATTR_PATH = "list_attr_celeba.txt"   # drop the file alongside this script
+CELEBA_ATTR_PATH = "list_attr_celeba.txt"   # extracted from list_attr_celeba.zip if needed
+CELEBA_ZIP_PATH  = "list_attr_celeba.zip"
 TARGET_ATTR = "Smiling"
 
 
@@ -105,7 +106,14 @@ def download_celeba_attributes(dest_path: str) -> None:
 
 
 if not os.path.exists(CELEBA_ATTR_PATH):
-    download_celeba_attributes(CELEBA_ATTR_PATH)
+    if os.path.exists(CELEBA_ZIP_PATH):
+        import zipfile
+        print(f"Extracting '{CELEBA_ATTR_PATH}' from '{CELEBA_ZIP_PATH}' …")
+        with zipfile.ZipFile(CELEBA_ZIP_PATH, "r") as zf:
+            zf.extract("list_attr_celeba.txt")
+        print("Extraction complete.")
+    else:
+        download_celeba_attributes(CELEBA_ATTR_PATH)
 
 print(f"Loading CelebA attributes from '{CELEBA_ATTR_PATH}' …")
 df = load_celeba_attributes(CELEBA_ATTR_PATH)
