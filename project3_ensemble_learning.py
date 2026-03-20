@@ -19,8 +19,7 @@ The three models follow a natural progression of complexity:
 
 This script:
 1. Loads the CelebA attribute table (list_attr_celeba.txt).
-   If the file is not present it is downloaded automatically from
-   Google Drive using gdown (pip install gdown).
+   The file must be present locally (plain .txt or bundled .zip).
 2. Trains a Decision Tree, Random Forest, and AdaBoost classifier to
    predict the 'Smiling' attribute from the remaining 39 attributes.
 3. Evaluates all three models with accuracy, precision, recall, F1,
@@ -110,41 +109,8 @@ def load_celeba_attributes(path: str) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 2 — LOAD DATA
 # ─────────────────────────────────────────────────────────────────────────────
-def download_celeba_attributes(dest_path: str) -> None:
-    """Download list_attr_celeba.txt from the official CelebA Google Drive mirror.
-
-    Requires the ``gdown`` package (pip install gdown).
-    The file is ~25 MB and contains binary attribute labels for 202,599 images.
-
-    If Google Drive quota is exceeded (common with popular datasets), follow
-    the manual download instructions printed in the RuntimeError message.
-    """
-    try:
-        import gdown  # type: ignore
-    except ImportError as exc:
-        raise ImportError(
-            "The 'gdown' package is required to download the CelebA attribute file.\n"
-            "Install it with:  pip install gdown"
-        ) from exc
-
-    # Official CelebA Google Drive file ID for list_attr_celeba.txt
-    CELEBA_FILE_ID = "0B7EVK8r0v71pblRyaVFSWGxPY0U"
-    url = f"https://drive.google.com/uc?id={CELEBA_FILE_ID}"
-    print(f"Downloading CelebA attribute file to '{dest_path}' …")
-    gdown.download(url, dest_path, quiet=False)
-    if not os.path.exists(dest_path):
-        raise RuntimeError(
-            "Download failed. Possible causes: no internet connection, Google Drive\n"
-            "quota exceeded, or the file ID has changed.\n"
-            "As a fallback, download list_attr_celeba.txt manually from\n"
-            "https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html\n"
-            "and place it in the same directory as this script."
-        )
-    print("Download complete.")
-
-
-# Attempt to locate the attribute file; extract from zip or download if missing.
-# Priority order: plain .txt > bundled .zip > remote download
+# Attempt to locate the attribute file; extract from zip if the plain .txt is missing.
+# Priority order: plain .txt > bundled .zip
 if not os.path.exists(CELEBA_ATTR_PATH):
     if os.path.exists(CELEBA_ZIP_PATH):
         import zipfile
@@ -153,7 +119,11 @@ if not os.path.exists(CELEBA_ATTR_PATH):
             zf.extract("list_attr_celeba.txt")
         print("Extraction complete.")
     else:
-        download_celeba_attributes(CELEBA_ATTR_PATH)
+        raise FileNotFoundError(
+            f"CelebA attribute file not found: '{CELEBA_ATTR_PATH}'.\n"
+            "Place list_attr_celeba.txt (or list_attr_celeba.zip) in the same "
+            "directory as this script."
+        )
 
 print(f"Loading CelebA attributes from '{CELEBA_ATTR_PATH}' …")
 df = load_celeba_attributes(CELEBA_ATTR_PATH)

@@ -19,15 +19,10 @@ Dataset: CelebA | Target attribute: *Smiling*
 ## Quick Start
 
 ```bash
-pip install pandas scikit-learn matplotlib seaborn gdown
+pip install pandas scikit-learn matplotlib seaborn
 
-# The script downloads list_attr_celeba.txt automatically on first run
+# list_attr_celeba.txt (or list_attr_celeba.zip) must be present in this directory
 python3 project3_ensemble_learning.py
-
-# Alternatively, download list_attr_celeba.txt manually:
-# 1. Download from https://mmlab.ie.cuhk.edu.hk/projects/CelebA.html
-# 2. Place it in this directory
-# 3. python3 project3_ensemble_learning.py
 ```
 
 ## Submission
