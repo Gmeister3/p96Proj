@@ -1,7 +1,7 @@
 """
 COSC 3P96 – Machine Learning Projects
 Project 3: Ensemble Learning for Robust Facial Attribute Classification
-Dataset: CelebA (attributes only — no image download required)
+Dataset: CelebA 
 
 Overview
 --------
@@ -19,7 +19,6 @@ The three models follow a natural progression of complexity:
 
 This script:
 1. Loads the CelebA attribute table (list_attr_celeba.txt).
-   The file must be present locally (plain .txt or bundled .zip).
 2. Trains a Decision Tree, Random Forest, and AdaBoost classifier to
    predict the 'Smiling' attribute from the remaining 39 attributes.
 3. Evaluates all three models with accuracy, precision, recall, F1,
@@ -32,10 +31,6 @@ This script:
       fig5_metrics_comparison.png               — grouped bar chart of all metrics
 5. Prints a concise results summary table and discussion.
 
-Submission note
----------------
-Paste this file's source + printed outputs + the five saved figures
-into a single PDF before uploading to Brightspace.
 """
 
 # ── Imports ──────────────────────────────────────────────────────────────────
