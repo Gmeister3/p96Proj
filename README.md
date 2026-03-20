@@ -9,6 +9,7 @@ Dataset: CelebA | Target attribute: *Smiling*
 |---|---|
 | `project3_ensemble_learning.py` | Complete implementation (Decision Tree → Random Forest → AdaBoost) |
 | `PRESENTATION_GUIDE.md` | Slide-by-slide presentation guide with talking points |
+| `PRESENTATION_SCRIPT.md` | Full word-for-word spoken script (~10–12 min) with Q&A responses |
 | `fig1_decision_tree_depth_vs_accuracy.png` | Bias–variance trade-off for the DT baseline |
 | `fig2_random_forest_n_estimators.png` | RF accuracy vs number of trees |
 | `fig3_roc_curves.png` | ROC curves for all three models |
