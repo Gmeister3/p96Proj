@@ -234,46 +234,66 @@ print("Saved fig1_decision_tree_depth_vs_accuracy.png")
 #     very strong, different trees use different feature subsets, so they make
 #     different errors that cancel out when averaged.
 #
-# The main hyperparameter is n_estimators (number of trees).
-#   • Too few trees → noisy predictions (high variance between runs).
-#   • More trees always helps or stays neutral — RF does not overfit with
-#     more trees; it just stops improving after a point.
-#   We test n_estimators ∈ {10, 25, 50, 100, 200, 300} and pick the best on validation.
+# Two key hyperparameters are tuned jointly:
+#   • n_estimators — number of trees; more trees always helps or plateaus (no overfitting).
+#   • max_features — features considered at each split; controls tree diversity:
+#       'sqrt'  → √p ≈ 6 features (sklearn default) — moderate decorrelation
+#       'log2'  → log₂(p) ≈ 5 features             — stronger decorrelation
+#       None    → all p=39 features                  — no random subsampling
+#   We grid-search n_estimators ∈ {10, 25, 50, 100, 200, 300} × max_features ∈ {sqrt, log2, None}
+#   and pick the combination with the best validation accuracy.
 print("\n" + "=" * 60)
 print("SECTION 4 — Random Forest (Bagging)")
 print("=" * 60)
 
-n_est_options = [10, 25, 50, 100, 200, 300]
-rf_val_acc = []
+n_est_options      = [10, 25, 50, 100, 200, 300]
+max_features_options = ["sqrt", "log2", None]   # None = use all 39 features
 
-for n in n_est_options:
-    # n_jobs=-1 uses all available CPU cores to parallelise tree construction
-    rf = RandomForestClassifier(n_estimators=n, random_state=42, n_jobs=-1)
-    rf.fit(X_train, y_train)
-    rf_val_acc.append(accuracy_score(y_val, rf.predict(X_val)))
+# rf_val_grid[mf] = list of validation accuracies for each n_est_options entry
+rf_val_grid = {}
+for mf in max_features_options:
+    accs = []
+    for n in n_est_options:
+        # n_jobs=-1 uses all available CPU cores to parallelise tree construction
+        rf = RandomForestClassifier(n_estimators=n, max_features=mf,
+                                    random_state=42, n_jobs=-1)
+        rf.fit(X_train, y_train)
+        accs.append(accuracy_score(y_val, rf.predict(X_val)))
+    rf_val_grid[mf] = accs
 
-best_n_rf = n_est_options[np.argmax(rf_val_acc)]
-print(f"Best n_estimators on validation set: {best_n_rf}  "
-      f"(val_acc = {max(rf_val_acc):.4f})")
+# Find the (n_estimators, max_features) combo with the highest validation accuracy
+best_n_rf, best_mf_rf = max(
+    ((n, mf) for mf in max_features_options for n in n_est_options),
+    key=lambda t: rf_val_grid[t[1]][n_est_options.index(t[0])]
+)
+best_rf_val_acc = rf_val_grid[best_mf_rf][n_est_options.index(best_n_rf)]
+mf_label = {None: "all"}.get(best_mf_rf, best_mf_rf)
+print(f"Best RF on validation set: n_estimators={best_n_rf}, max_features={mf_label}  "
+      f"(val_acc = {best_rf_val_acc:.4f})")
 
 # Re-train the best RF on the full train+val set before evaluating on the test set
-rf_best = RandomForestClassifier(n_estimators=best_n_rf, random_state=42, n_jobs=-1)
+rf_best = RandomForestClassifier(n_estimators=best_n_rf, max_features=best_mf_rf,
+                                 random_state=42, n_jobs=-1)
 rf_best.fit(X_trainval, y_trainval)
 rf_proba = rf_best.predict_proba(X_test)[:, 1]   # probability of smiling
 rf_pred  = rf_best.predict(X_test)
 
-# ── Figure 2: RF n_estimators vs accuracy ──────────────────────────────────
-# The curve is expected to rise steeply for small T and plateau for large T.
-# Once trees are sufficiently decorrelated, the marginal benefit of adding
-# one more tree becomes negligible.
-fig, ax = plt.subplots(figsize=(7, 4.5))
-ax.plot(n_est_options, rf_val_acc, "D-", color="#55A868")
+# ── Figure 2: RF tuning — n_estimators vs accuracy per max_features ────────
+# Each line shows how validation accuracy changes with ensemble size for a given
+# max_features setting.  The dashed vertical line marks the best configuration.
+mf_colors = {"sqrt": "#55A868", "log2": "#4C72B0", None: "#DD8452"}
+mf_labels = {"sqrt": "sqrt (≈6 features)", "log2": "log2 (≈5 features)",
+             None: "all 39 features"}
+fig, ax = plt.subplots(figsize=(8, 4.5))
+for mf in max_features_options:
+    ax.plot(n_est_options, rf_val_grid[mf], "D-",
+            color=mf_colors[mf], label=f"max_features={mf_labels[mf]}")
 ax.axvline(best_n_rf, color="gray", linestyle="--", alpha=0.7,
-           label=f"Best n_estimators = {best_n_rf}")
+           label=f"Best: n_est={best_n_rf}, max_feat={mf_label}")
 ax.set_xlabel("Number of Trees (n_estimators)")
 ax.set_ylabel("Validation Accuracy")
-ax.set_title("Random Forest: Number of Trees vs. Accuracy\n(More trees → lower variance)")
-ax.legend()
+ax.set_title("Random Forest: Tuning n_estimators & max_features\n(More trees → lower variance)")
+ax.legend(fontsize=8)
 fig.tight_layout()
 fig.savefig("fig2_random_forest_n_estimators.png", dpi=150)
 plt.close(fig)
@@ -307,33 +327,52 @@ print("Saved fig2_random_forest_n_estimators.png")
 #   • More sensitive to label noise than RF (noisy labels get repeatedly
 #     up-weighted, leading to overfitting on noise).
 #
-# Hyperparameter choices:
-#   • max_depth=1  — "decision stump" base learner: a single binary split.
-#     Stumps are weak enough to satisfy the theoretical guarantee that each
-#     round beats random chance (εₜ < 0.5).
-#   • n_estimators=200 — enough rounds to reduce bias substantially on this
-#     dataset; overfitting is limited because each stump has very low variance.
-#   • learning_rate=0.5 — shrinks each αₜ by 0.5 before adding to the ensemble,
-#     trading convergence speed for better generalisation (similar to the
-#     step-size in gradient descent).
+# Hyperparameter tuning (on the validation set, same protocol as DT and RF):
+#   • n_estimators ∈ {100, 200, 300} — number of sequential weak learners.
+#   • learning_rate ∈ {0.1, 0.5, 1.0} — shrinks each αₜ before adding it to
+#     the ensemble; lower values generalise better but need more rounds.
+#   • max_depth ∈ {1, 2} — base learner depth.  depth=1 is the classical
+#     "decision stump"; depth=2 gives slightly more expressive learners that
+#     may reduce bias faster on this dataset.
 print("\n" + "=" * 60)
 print("SECTION 5 — AdaBoost (Boosting)")
 print("=" * 60)
 
-# Weak learner: decision stump (depth=1 tree — splits on exactly one feature)
-stump = DecisionTreeClassifier(max_depth=1)
+n_est_ada_options  = [100, 200, 300]
+lr_ada_options     = [0.1, 0.5, 1.0]
+depth_ada_options  = [1, 2]
+
+best_ada_score  = -1.0
+best_ada_params = {}
+for n in n_est_ada_options:
+    for lr in lr_ada_options:
+        for d in depth_ada_options:
+            base = DecisionTreeClassifier(max_depth=d)
+            clf  = AdaBoostClassifier(
+                estimator=base, n_estimators=n, learning_rate=lr, random_state=42
+            )
+            clf.fit(X_train, y_train)
+            score = accuracy_score(y_val, clf.predict(X_val))
+            if score > best_ada_score:
+                best_ada_score  = score
+                best_ada_params = {"n_estimators": n, "learning_rate": lr, "max_depth": d}
+
+print(f"Best AdaBoost on validation set: {best_ada_params}  "
+      f"(val_acc = {best_ada_score:.4f})")
+
+# Re-train the best AdaBoost on the full train+val set
+best_base = DecisionTreeClassifier(max_depth=best_ada_params["max_depth"])
 ada = AdaBoostClassifier(
-    estimator=stump,
-    n_estimators=200,
-    learning_rate=0.5,
+    estimator=best_base,
+    n_estimators=best_ada_params["n_estimators"],
+    learning_rate=best_ada_params["learning_rate"],
     random_state=42,
 )
-# Train directly on train+val (no separate validation needed for hyperparameter
-# selection here; we use the fixed choices justified above)
 ada.fit(X_trainval, y_trainval)
 ada_proba = ada.predict_proba(X_test)[:, 1]   # probability of smiling
 ada_pred  = ada.predict(X_test)
-print(f"AdaBoost trained  (n_estimators=200, lr=0.5, base=DecisionStump)")
+print(f"AdaBoost trained  (n_estimators={best_ada_params['n_estimators']}, "
+      f"lr={best_ada_params['learning_rate']}, max_depth={best_ada_params['max_depth']})")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 6 — EVALUATION
@@ -496,15 +535,17 @@ Random Forest (Bagging)
   - Most informative features: {', '.join([feature_names[i] for i in sorted_idx[-3:]][::-1])}.
 
 AdaBoost (Boosting)
-  - Trains weak learners (stumps) sequentially; each round up-weights
-    misclassified samples so the next stump corrects prior errors.
+  - Trains weak learners sequentially; each round up-weights
+    misclassified samples so the next learner corrects prior errors.
   - Reduces bias; can overfit on noisy data if n_estimators is too large
     or the labels contain significant noise.
+  - Tuned: n_estimators, learning_rate, base learner max_depth.
   - Accuracy: {results_df.loc['AdaBoost','Accuracy']:.4f}
 
 Best model by F1: {best_model}
-  → Ensemble methods outperform the single Decision Tree, demonstrating
-    that combining learners improves both accuracy and robustness.
+  → With all three models tuned on the same validation set, ensemble
+    methods are expected to outperform the single Decision Tree,
+    demonstrating that combining learners improves accuracy and robustness.
   → Bagging (RF) and boosting (AdaBoost) address *different* sources of
     error: RF lowers variance by averaging; AdaBoost lowers bias by
     iterative error correction.  Both strategies are valid but suited to
